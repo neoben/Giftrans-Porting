@@ -1,0 +1,85 @@
+--- giftrans.c.orig	Mon Sep 12 14:41:10 2011
++++ giftrans.c	Mon Sep 12 14:39:19 2011
+@@ -235,13 +235,14 @@
+ 	} bc,tc,tn,go,gn;
+ 
+ static char	*image,*comment;
+-static int	skipcomment,list,verbose,output,debug;
++static int	skipcomment,list,verbose,output,debug,swap;
+ static long int	pos;
+ 
+ static char	rgbtxt[] = RGBTXT, *rgb = rgbtxt;
+ static char	true[] = "True";
+ static char	false[] = "False";
+ 
++
+ #define	readword(buffer)	((buffer)[0]+256*(buffer)[1])
+ #define	readflag(buffer)	((buffer)?true:false)
+ #define	hex(c)			('a'<=(c)&&(c)<='z'?(c)-'a'+10:'A'<=(c)&&(c)<='Z'?(c)-'A'+10:(c)-'0')
+@@ -446,6 +447,17 @@
+ 			gct[3*go.index+1]=gn.green;
+ 			gct[3*go.index+2]=gn.blue;
+ 		}
++		if(swap)
++		{
++			unsigned char temp;
++			for(cnt=0;cnt<gct_size;cnt++)
++			{
++				temp=gct[3*cnt];		
++				gct[3*cnt]=gct[3*cnt+2];
++				gct[3*cnt+2]=gct[3*cnt+1];
++				gct[3*cnt+1]=temp;
++			}
++		}
+ 		if (bc.index==RGB)
+ 			for(cnt=0;cnt<gct_size&&bc.index==RGB;cnt++)
+ 				if (gct[3*cnt]==bc.red&&gct[3*cnt+1]==bc.green&&gct[3*cnt+2]==bc.blue)
+@@ -561,6 +573,17 @@
+ 					buffer[3*tc.index+1]=tn.green;
+ 					buffer[3*tc.index+2]=tn.blue;
+ 				}
++				if(swap)
++				{
++					unsigned char temp;
++					for(cnt=0;cnt<size;cnt++)
++					{
++						temp=buffer[3*cnt];		
++						buffer[3*cnt]=buffer[3*cnt+2];
++						buffer[3*cnt+2]=buffer[3*cnt+1];
++						buffer[3*cnt+1]=temp;
++					}
++				}
+ 				if (debug)
+ 					dump(pos,buffer,size*3);
+ 				if (output)
+@@ -767,6 +790,7 @@
+ {
+ 	(void)fprintf(stderr,"Usage: %s [-t color|-T] [-B color] [-b color] [-g oldcolor=newcolor] [-c comment|-C] [-l|-L|-V] [-o filename] [-e filename] [filename]\n",image);
+ 	(void)fprintf(stderr,"Convert any GIF file into a GIF89a, with the folloing changes possible:\n");
++	(void)fprintf(stderr,"-s Swap colors in the global color table\n");
+ 	(void)fprintf(stderr,"-t Specify the transparent color\n");
+ 	(void)fprintf(stderr,"-T Index of the transparent color is the background color index\n");
+ 	(void)fprintf(stderr,"-B Specify the transparent color's new value\n");
+@@ -860,8 +884,12 @@
+ 	debug=FALSE;
+ 	oname=NULL;
+ 	ename=NULL;
+-	while ((c=getopt(argc,argv,"t:TB:b:g:c:ClLVDo:e:vh?")) != EOF)
++	swap=FALSE;
++	while ((c=getopt(argc,argv,"t:sTB:b:g:c:ClLVDo:e:vh?")) != EOF)
+ 		switch ((char)c) {
++		case 's':
++			swap=TRUE;
++			break;
+ 		case 'b':
+ 			if (getindex(&bc,optarg))
+ 				return(FAILURE);
+@@ -924,7 +952,7 @@
+ 		case '?':
+ 			usage();
+ 		}
+-	if (optind+1<argc||(bc.index==NONE&&tc.index==NONE&&tn.index==NONE&&gn.index==NONE&&comment==NULL&&!skipcomment&&!list&&!verbose))
++	if (optind+1<argc||(bc.index==NONE&&tc.index==NONE&&tn.index==NONE&&gn.index==NONE&&comment==NULL&&!skipcomment&&!list&&!verbose&&!swap))
+ 		usage();
+ 
+ 	if (oname&&freopen(oname,"wb",stdout)==NULL) {

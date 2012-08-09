@@ -1,0 +1,120 @@
+Overview:
+========
+Giftrans Porting - Darkness Patch: patch for the Giftrans tool.
+The patch implements a new option in the Giftrans software.
+The option can be used to decrease the colors brightness of the image according to the darkness index (option parameter).
+
+Author:
+======
+Carmine Benedetto
+
+Website: http://www.carminebenedetto.net
+Email: carmine.benedetto[at]gmail.com
+
+
+Patch Description:
+=================
+The patch modify each entry of the RGB Global Color Table and of the RGB Local Color table using the following rules:
+
+- GLOBAL COLOR TABLE
+	gct[RED] = gct[RED] / (2 * dark_v);		
+	gct[GREEN] = gct[GREEN] / (2 * dark_v);
+	gct[BLUE] = gct[BLUE] / (2 * dark_v);
+
+- LOCAL COLOR TABLE
+	buffer[RED] = buffer[RED] / (2 * dark_v);
+	buffer[GREEN] = buffer[GREEN] / (2 * dark_v);
+	buffer[BLUE] = buffer[BLUE] / (2 * dark_v);
+
+The 'dark_v' variable depends on the darkness option parameter.
+
+
+New Option Sintax:
+=================
+-d darkness_index
+
+Possible values for 'darkness_index': 0 - black and white image, 1, 2 or 3.
+The higher the 'darkness_index' chosen, the higher the image darkness level.
+
+
+Usage:
+=====
+./giftrans -d <index_parameter> <input_file> -o <output_file>
+
+
+Usage Examples:
+==============
+./giftrans -d 0 image.gif -o p0.gif
+./giftrans -d 1 image.gif -o p1.gif
+./giftrans -d 2 image.gif -o p2.gif
+./giftrans -d 3 image.gif -o p3.gif
+
+
+Tests:
+=====
+The directory test/ contains some operating tests.
+
+
+Command used to generate the patch file:
+=======================================
+diff -aNur giftrans.c.orig giftrans.c > patch-dk
+
+- a , treats it as text;
+- N , treats absent files as empty;
+- u , output as unified;
+- r , recursively.
+
+
+Command used to add the patch to the original code:
+==================================================
+patch < patch-dk
+patch gitrans.c.origin patch-dk
+
+
+Note about some Giftrans Errors:
+===============================
+The Giftrans software to work needs a the "rgb.txt" file.
+If this file is missing on your Operating System, you can find it in the utils/ directory.
+
+See the following Giftrans code section to find out where to copy the "rgb.txt" file:
+
+#define X11             /* When using X Window System */
+#undef  OPENWIN         /* When using Open Windows */
+#undef  X386            /* When using XFree86 with FreeBSD/386BSD */
+#undef  OS2             /* When using IBM C/C++ 2.0 */
+#ifndef MSDOS           /* required for TurboC 1.0 */
+#undef  MSDOS           /* When using Borland C (maybe MSC too) */
+#endif
+
+#ifndef OS2_OR_MSDOS
+#ifdef OS2
+#define OS2_OR_MSDOS
+#endif /* OS2 */
+#ifdef MSDOS
+#define OS2_OR_MSDOS
+#endif /* MSDOS */
+#endif /* OS2_OR_MSDOS */
+
+char copyright[] = "@(#)Copyright (C) 1994 by Andreas Ley (ley@rz.uni-karlsruhe.de)";
+char sccsid[] = "@(#)GIFtrans v1.12.2 - Transpose GIF files";
+
+#ifndef RGBTXT
+#ifdef X11
+#define RGBTXT  "/usr/lib/X11/rgb.txt"
+#else /* X11 */
+#ifdef OPENWIN
+#define RGBTXT  "/usr/openwin/lib/rgb.txt"
+#else /* OPENWIN */
+#ifdef X386
+#define RGBTXT  "/usr/X386/lib/X11/rgb.txt"
+#else /* X386 */
+#ifdef OS2_OR_MSDOS
+#define RGBTXT  "rgb.txt"
+#else /* OS2_OR_MSDOS */
+#define RGBTXT  "";
+#endif /* OS2_OR_MSDOS */
+#endif /* X386 */
+#endif /* OPENWIN */
+#endif /* X11 */
+#endif /* RGBTXT */
+

@@ -1,0 +1,141 @@
+--- giftrans.c.orig	2012-06-04 20:14:02.000000000 +0200
++++ giftrans.c	2012-06-27 16:01:20.936998386 +0200
+@@ -151,7 +151,7 @@
+ #undef	OPENWIN		/* When using Open Windows */
+ #undef	X386		/* When using XFree86 with FreeBSD/386BSD */
+ #undef	OS2		/* When using IBM C/C++ 2.0 */
+-#ifndef	MSDOS	/* required for TurboC 1.0 */
++#ifndef	MSDOS		/* required for TurboC 1.0 */
+ #undef	MSDOS		/* When using Borland C (maybe MSC too) */
+ #endif
+ 
+@@ -235,13 +235,15 @@
+ 	} bc,tc,tn,go,gn;
+ 
+ static char	*image,*comment;
+-static int	skipcomment,list,verbose,output,debug;
++static int	skipcomment,list,verbose,output,debug,darkness;
+ static long int	pos;
++static int dark_v;	// darkness index
+ 
+ static char	rgbtxt[] = RGBTXT, *rgb = rgbtxt;
+ static char	true[] = "True";
+ static char	false[] = "False";
+ 
++
+ #define	readword(buffer)	((buffer)[0]+256*(buffer)[1])
+ #define	readflag(buffer)	((buffer)?true:false)
+ #define	hex(c)			('a'<=(c)&&(c)<='z'?(c)-'a'+10:'A'<=(c)&&(c)<='Z'?(c)-'A'+10:(c)-'0')
+@@ -429,7 +431,8 @@
+ 	/* Global Color Table */
+ 	gct_delay=FALSE;
+ 	if (lsd[4]&0x80) {
+-		gct_size=2<<(lsd[4]&0x7);
++
++		gct_size=2<<(lsd[4]&0x7); 
+ 		pos=ftell(src);
+ 		(void)fread((void *)gct,gct_size,3,src);
+ 		if (go.index==RGB)
+@@ -446,6 +449,25 @@
+ 			gct[3*go.index+1]=gn.green;
+ 			gct[3*go.index+2]=gn.blue;
+ 		}
++		if(darkness)
++		{							
++			for(cnt = 0; cnt < gct_size; cnt++) {
++
++				/* Black and white image */
++				if(dark_v == 0) {
++					gct[3*cnt] = gct[3*cnt];
++                                        gct[3*cnt + 1] = gct[3*cnt];
++                                        gct[3*cnt + 2] = gct[3*cnt];
++				}
++				/* Decrease the color scale */
++				else {
++
++					gct[3*cnt] = gct[3*cnt] / (2 * dark_v);				
++					gct[3*cnt + 1] = gct[3*cnt + 1] / (2 * dark_v);				
++					gct[3*cnt + 2] = gct[3*cnt + 2] / (2 * dark_v);					
++				}
++			}
++		}
+ 		if (bc.index==RGB)
+ 			for(cnt=0;cnt<gct_size&&bc.index==RGB;cnt++)
+ 				if (gct[3*cnt]==bc.red&&gct[3*cnt+1]==bc.green&&gct[3*cnt+2]==bc.blue)
+@@ -561,6 +583,25 @@
+ 					buffer[3*tc.index+1]=tn.green;
+ 					buffer[3*tc.index+2]=tn.blue;
+ 				}
++				if(darkness)
++				{
++					for(cnt = 0;cnt < size; cnt++) {
++						
++						/* Black and white image */
++                                		if(dark_v == 0) {
++							buffer[3*cnt] = buffer[3*cnt];
++                                                        buffer[3*cnt + 1] = buffer[3*cnt];
++                                                        buffer[3*cnt + 2] = buffer[3*cnt];
++						}
++						/* Decrease the color scale */
++						else {
++							buffer[3*cnt] = buffer[3*cnt] / (2 * dark_v);
++							buffer[3*cnt + 1] = buffer[3*cnt + 1] / (2 * dark_v);
++							buffer[3*cnt + 2] = buffer[3*cnt + 2] / (2 * dark_v);	
++						}					
++					}					
++
++				}
+ 				if (debug)
+ 					dump(pos,buffer,size*3);
+ 				if (output)
+@@ -765,11 +806,12 @@
+ 
+ void usage()
+ {
+-	(void)fprintf(stderr,"Usage: %s [-t color|-T] [-B color] [-b color] [-g oldcolor=newcolor] [-c comment|-C] [-l|-L|-V] [-o filename] [-e filename] [filename]\n",image);
++	(void)fprintf(stderr,"Usage: %s [-t color|-T] [-B color] [-d darkness_index] [-b color] [-g oldcolor=newcolor] [-c comment|-C] [-l|-L|-V] [-o filename] [-e filename] [filename]\n",image);
+ 	(void)fprintf(stderr,"Convert any GIF file into a GIF89a, with the folloing changes possible:\n");
+ 	(void)fprintf(stderr,"-t Specify the transparent color\n");
+ 	(void)fprintf(stderr,"-T Index of the transparent color is the background color index\n");
+ 	(void)fprintf(stderr,"-B Specify the transparent color's new value\n");
++	(void)fprintf(stderr,"-d Decrease the colors brightness of the image according to the darkness index (Possible value for the darkness index: 0 - black and white image, 1, 2 or 3)\n");
+ 	(void)fprintf(stderr,"-b Specify the background color\n");
+ 	(void)fprintf(stderr,"-g Change a color in the global color table\n");
+ 	(void)fprintf(stderr,"-c Add a comment\n");
+@@ -853,6 +895,7 @@
+ 	tn.index=NONE;
+ 	go.index=NONE;
+ 	gn.index=NONE;
++	dark_v=NONE;
+ 	comment=NULL;
+ 	skipcomment=FALSE;
+ 	verbose=FALSE;
+@@ -860,8 +903,18 @@
+ 	debug=FALSE;
+ 	oname=NULL;
+ 	ename=NULL;
+-	while ((c=getopt(argc,argv,"t:TB:b:g:c:ClLVDo:e:vh?")) != EOF)
++	darkness=FALSE;
++	while ((c=getopt(argc,argv,"t:TB:d:b:g:c:ClLVDo:e:vh?")) != EOF)
+ 		switch ((char)c) {
++		case 'd':
++			darkness=TRUE;
++			dark_v = atoi(optarg);
++			/* Check the darkness index. Possible values: 1, 2, 3 */
++			if((dark_v < 0) || (dark_v > 3)) {
++				printf("Wrong darkness index. Type ./giftrans -h for help.\n");
++				return(FAILURE);			
++			}
++			break;
+ 		case 'b':
+ 			if (getindex(&bc,optarg))
+ 				return(FAILURE);
+@@ -924,7 +977,7 @@
+ 		case '?':
+ 			usage();
+ 		}
+-	if (optind+1<argc||(bc.index==NONE&&tc.index==NONE&&tn.index==NONE&&gn.index==NONE&&comment==NULL&&!skipcomment&&!list&&!verbose))
++	if (optind+1<argc||(bc.index==NONE&&tc.index==NONE&&tn.index==NONE&&gn.index==NONE&&comment==NULL&&!skipcomment&&!list&&!verbose&&!darkness&&dark_v==NONE))
+ 		usage();
+ 
+ 	if (oname&&freopen(oname,"wb",stdout)==NULL) {
